@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Switch, Pressable, Alert, Platform, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Button } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS, SPACING, FONT_SIZES } from '../utils/theme';
+import { useColors } from '../context/AppContext';
+import { SPACING, FONT_SIZES, ColorPalette } from '../utils/theme';
 import {
   scheduleDailyReminder,
   cancelDailyReminder,
@@ -28,6 +29,9 @@ const DEFAULT_SETTINGS: NotificationSettings = {
 };
 
 export const NotificationsScreen: React.FC = () => {
+  const COLORS = useColors();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
   const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -90,22 +94,24 @@ export const NotificationsScreen: React.FC = () => {
     }
 
     const newValue = !settings.dailyReminder;
-    const newSettings = { ...settings, dailyReminder: newValue };
 
     if (newValue) {
-      // Schedule daily reminder
       const identifier = await scheduleDailyReminder(settings.dailyReminderHour, settings.dailyReminderMinute);
-
       if (identifier) {
-        saveSettings(newSettings);
+        saveSettings({ ...settings, dailyReminder: true });
         Alert.alert('✅ Reminder Set', `Daily expense reminder scheduled for ${formatTime(settings.dailyReminderHour, settings.dailyReminderMinute)}`);
       } else {
-        Alert.alert('Error', 'Failed to schedule reminder. Please check notification permissions.');
+        const recheck = await requestNotificationPermissions();
+        if (!recheck) {
+          setPermissionGranted(false);
+          Alert.alert('Permission Denied', 'Please enable notifications in your device settings to activate reminders.');
+        } else {
+          Alert.alert('Error', 'Failed to schedule reminder. Please try again.');
+        }
       }
     } else {
-      // Cancel daily reminder
       await cancelDailyReminder();
-      saveSettings(newSettings);
+      saveSettings({ ...settings, dailyReminder: false });
       Alert.alert('Reminder Cancelled', 'Daily expense reminder has been turned off.');
     }
   };
@@ -118,13 +124,10 @@ export const NotificationsScreen: React.FC = () => {
 
   const saveTime = async () => {
     const newSettings = { ...settings, dailyReminderHour: tempHour, dailyReminderMinute: tempMinute };
-    
     if (settings.dailyReminder) {
-      // Reschedule with new time
       await cancelDailyReminder();
       await scheduleDailyReminder(tempHour, tempMinute);
     }
-    
     saveSettings(newSettings);
     setShowTimePicker(false);
     Alert.alert('⏰ Time Updated', `Daily reminder will now trigger at ${formatTime(tempHour, tempMinute)}`);
@@ -145,7 +148,6 @@ export const NotificationsScreen: React.FC = () => {
       );
       return;
     }
-
     const newSettings = { ...settings, overspendingAlert: !settings.overspendingAlert };
     saveSettings(newSettings);
   };
@@ -179,8 +181,8 @@ export const NotificationsScreen: React.FC = () => {
             {Platform.OS === 'web'
               ? 'Local notifications only work in standalone builds (APK/AAB). Build with EAS to enable notifications.'
               : permissionGranted
-              ? 'Notifications are enabled and will work when app is installed.'
-              : 'Notification permissions are required. Tap settings below to enable.'}
+                ? 'Notifications are enabled and will work when app is installed.'
+                : 'Notification permissions are required. Tap settings below to enable.'}
           </Text>
         </View>
 
@@ -238,7 +240,6 @@ export const NotificationsScreen: React.FC = () => {
             />
           </View>
 
-          {/* FIX #6: Overspending Limit Input */}
           {settings.overspendingAlert && (
             <Pressable style={styles.timeSelector} onPress={openLimitInput}>
               <View style={styles.timeSelectorContent}>
@@ -273,7 +274,7 @@ export const NotificationsScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* FIX #5: Time Picker Modal */}
+      {/* Time Picker Modal */}
       <Modal
         visible={showTimePicker}
         transparent
@@ -283,7 +284,7 @@ export const NotificationsScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Select Reminder Time</Text>
-            
+
             <View style={styles.timePickerContainer}>
               {/* Hour Picker */}
               <View style={styles.pickerColumn}>
@@ -292,16 +293,10 @@ export const NotificationsScreen: React.FC = () => {
                   {Array.from({ length: 24 }, (_, i) => (
                     <Pressable
                       key={i}
-                      style={[
-                        styles.pickerItem,
-                        tempHour === i && styles.pickerItemSelected
-                      ]}
+                      style={[styles.pickerItem, tempHour === i && styles.pickerItemSelected]}
                       onPress={() => setTempHour(i)}
                     >
-                      <Text style={[
-                        styles.pickerItemText,
-                        tempHour === i && styles.pickerItemTextSelected
-                      ]}>
+                      <Text style={[styles.pickerItemText, tempHour === i && styles.pickerItemTextSelected]}>
                         {i % 12 || 12} {i >= 12 ? 'PM' : 'AM'}
                       </Text>
                     </Pressable>
@@ -316,16 +311,10 @@ export const NotificationsScreen: React.FC = () => {
                   {[0, 15, 30, 45].map((m) => (
                     <Pressable
                       key={m}
-                      style={[
-                        styles.pickerItem,
-                        tempMinute === m && styles.pickerItemSelected
-                      ]}
+                      style={[styles.pickerItem, tempMinute === m && styles.pickerItemSelected]}
                       onPress={() => setTempMinute(m)}
                     >
-                      <Text style={[
-                        styles.pickerItemText,
-                        tempMinute === m && styles.pickerItemTextSelected
-                      ]}>
+                      <Text style={[styles.pickerItemText, tempMinute === m && styles.pickerItemTextSelected]}>
                         :{m.toString().padStart(2, '0')}
                       </Text>
                     </Pressable>
@@ -335,18 +324,14 @@ export const NotificationsScreen: React.FC = () => {
             </View>
 
             <View style={styles.modalButtons}>
-              <Button mode="outlined" onPress={() => setShowTimePicker(false)}>
-                Cancel
-              </Button>
-              <Button mode="contained" onPress={saveTime}>
-                Save
-              </Button>
+              <Button mode="outlined" onPress={() => setShowTimePicker(false)}>Cancel</Button>
+              <Button mode="contained" onPress={saveTime}>Save</Button>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* FIX #6: Spending Limit Input Modal */}
+      {/* Spending Limit Input Modal */}
       <Modal
         visible={showLimitInput}
         transparent
@@ -356,10 +341,8 @@ export const NotificationsScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Set Spending Limit</Text>
-            <Text style={styles.modalSubtitle}>
-              Alert me when daily spending exceeds:
-            </Text>
-            
+            <Text style={styles.modalSubtitle}>Alert me when daily spending exceeds:</Text>
+
             <View style={styles.limitInputContainer}>
               <Text style={styles.currencySymbol}>$</Text>
               <TextInput
@@ -373,12 +356,8 @@ export const NotificationsScreen: React.FC = () => {
             </View>
 
             <View style={styles.modalButtons}>
-              <Button mode="outlined" onPress={() => setShowLimitInput(false)}>
-                Cancel
-              </Button>
-              <Button mode="contained" onPress={saveLimit}>
-                Save
-              </Button>
+              <Button mode="outlined" onPress={() => setShowLimitInput(false)}>Cancel</Button>
+              <Button mode="contained" onPress={saveLimit}>Save</Button>
             </View>
           </View>
         </View>
@@ -387,7 +366,7 @@ export const NotificationsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -490,7 +469,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     lineHeight: 18,
   },
-  // Modal styles for time picker and limit input
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

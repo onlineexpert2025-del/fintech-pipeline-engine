@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, View, StyleSheet, AppState } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, AppState, AppStateStatus } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -10,7 +10,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { AppProvider, useApp } from './src/context/AppContext';
+import { AppProvider, useApp, useColors } from './src/context/AppContext';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { AddExpenseScreen } from './src/screens/AddExpenseScreen';
@@ -26,7 +26,6 @@ import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
 import { TermsScreen } from './src/screens/TermsScreen';
 import { BiometricLockScreen } from './src/screens/BiometricLockScreen';
-import { COLORS } from './src/utils/theme';
 import { isSystemInteracting } from './src/utils/systemInteraction';
 
 const Stack = createNativeStackNavigator();
@@ -34,7 +33,8 @@ const Tab = createBottomTabNavigator();
 
 function TabNavigator() {
   const insets = useSafeAreaInsets();
-  
+  const COLORS = useColors();
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -48,13 +48,8 @@ function TabNavigator() {
           paddingTop: 8,
           height: 60 + insets.bottom,
         },
-        headerStyle: {
-          backgroundColor: COLORS.surface,
-        },
-        headerTitleStyle: {
-          fontWeight: '600',
-          color: COLORS.text,
-        },
+        headerStyle: { backgroundColor: COLORS.surface },
+        headerTitleStyle: { fontWeight: '600', color: COLORS.text },
         headerShadowVisible: false,
       }}
     >
@@ -103,7 +98,8 @@ function TabNavigator() {
 }
 
 function AppNavigator() {
-  const { isLoading, isSetupComplete } = useApp();
+  const { isLoading, isSetupComplete, isDarkMode } = useApp();
+  const COLORS = useColors();
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingBiometric, setCheckingBiometric] = useState(true);
@@ -123,125 +119,118 @@ function AppNavigator() {
       const enabled = await AsyncStorage.getItem('biometricEnabled');
       const isEnabled = enabled === 'true';
       setBiometricEnabled(isEnabled);
-      setIsAuthenticated(!isEnabled); // If biometric not enabled, consider authenticated
+      setIsAuthenticated(!isEnabled);
     } catch (error) {
       console.error('Error checking biometric setting:', error);
-      setIsAuthenticated(true); // Default to authenticated on error
+      setIsAuthenticated(true);
     } finally {
       setCheckingBiometric(false);
     }
   };
 
   const handleAppStateChange = (nextAppState: string) => {
-    // FIX #2: Prevent biometric lock when interacting with camera/gallery
     if (isSystemInteracting()) {
       console.log('[BiometricLock] Ignoring AppState change - system interaction in progress');
-      appState.current = nextAppState;
+      appState.current = nextAppState as AppStateStatus;
       return;
     }
-
     if (
       appState.current.match(/active/) &&
       (nextAppState === 'background' || nextAppState === 'inactive')
     ) {
-      // Lock the app when going to background
       if (biometricEnabled) {
         console.log('[BiometricLock] Locking app - going to background');
         setIsAuthenticated(false);
       }
     }
-
-    appState.current = nextAppState;
+    appState.current = nextAppState as AppStateStatus;
   };
 
   if (isLoading || checkingBiometric) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: COLORS.background }]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
 
-  // Show biometric lock if enabled and not authenticated
   if (biometricEnabled && !isAuthenticated && isSetupComplete) {
     return <BiometricLockScreen onAuthenticated={() => setIsAuthenticated(true)} />;
   }
 
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: COLORS.surface,
-        },
-        headerTitleStyle: {
-          fontWeight: '600',
-          color: COLORS.text,
-        },
-        headerTintColor: COLORS.primary,
-        headerShadowVisible: false,
-      }}
-    >
-      {!isSetupComplete ? (
-        <Stack.Screen
-          name="Welcome"
-          component={WelcomeScreen}
-          options={{ headerShown: false }}
-        />
-      ) : (
-        <>
+    <>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: { backgroundColor: COLORS.surface },
+          headerTitleStyle: { fontWeight: '600', color: COLORS.text },
+          headerTintColor: COLORS.primary,
+          headerShadowVisible: false,
+        }}
+      >
+        {!isSetupComplete ? (
           <Stack.Screen
-            name="Main"
-            component={TabNavigator}
+            name="Welcome"
+            component={WelcomeScreen}
             options={{ headerShown: false }}
           />
-          <Stack.Screen
-            name="AddExpense"
-            component={AddExpenseScreen}
-            options={{ title: 'Add Expense' }}
-          />
-          <Stack.Screen
-            name="AddIncome"
-            component={AddIncomeScreen}
-            options={{ title: 'Add Income' }}
-          />
-          <Stack.Screen
-            name="Scanner"
-            component={ScannerScreen}
-            options={{ title: 'Scan Receipt' }}
-          />
-          <Stack.Screen
-            name="ResultScreen"
-            component={ResultScreen}
-            options={{ title: 'OCR Result' }}
-          />
-          <Stack.Screen
-            name="GoalDetail"
-            component={GoalDetailScreen}
-            options={{ title: 'Goal Details' }}
-          />
-          <Stack.Screen
-            name="Currency"
-            component={CurrencyScreen}
-            options={{ title: 'Select Currency' }}
-          />
-          <Stack.Screen
-            name="Notifications"
-            component={NotificationsScreen}
-            options={{ title: 'Notifications' }}
-          />
-          <Stack.Screen
-            name="PrivacyPolicy"
-            component={PrivacyPolicyScreen}
-            options={{ title: 'Privacy Policy' }}
-          />
-          <Stack.Screen
-            name="Terms"
-            component={TermsScreen}
-            options={{ title: 'Terms of Service' }}
-          />
-        </>
-      )}
-    </Stack.Navigator>
+        ) : (
+          <>
+            <Stack.Screen
+              name="Main"
+              component={TabNavigator}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="AddExpense"
+              component={AddExpenseScreen}
+              options={{ title: 'Add Expense' }}
+            />
+            <Stack.Screen
+              name="AddIncome"
+              component={AddIncomeScreen}
+              options={{ title: 'Add Income' }}
+            />
+            <Stack.Screen
+              name="Scanner"
+              component={ScannerScreen}
+              options={{ title: 'Scan Receipt' }}
+            />
+            <Stack.Screen
+              name="ResultScreen"
+              component={ResultScreen}
+              options={{ title: 'OCR Result' }}
+            />
+            <Stack.Screen
+              name="GoalDetail"
+              component={GoalDetailScreen}
+              options={{ title: 'Goal Details' }}
+            />
+            <Stack.Screen
+              name="Currency"
+              component={CurrencyScreen}
+              options={{ title: 'Select Currency' }}
+            />
+            <Stack.Screen
+              name="Notifications"
+              component={NotificationsScreen}
+              options={{ title: 'Notifications' }}
+            />
+            <Stack.Screen
+              name="PrivacyPolicy"
+              component={PrivacyPolicyScreen}
+              options={{ title: 'Privacy Policy' }}
+            />
+            <Stack.Screen
+              name="Terms"
+              component={TermsScreen}
+              options={{ title: 'Terms of Service' }}
+            />
+          </>
+        )}
+      </Stack.Navigator>
+    </>
   );
 }
 
@@ -252,7 +241,6 @@ export default function App() {
         <PaperProvider>
           <AppProvider>
             <NavigationContainer>
-              <StatusBar style="dark" />
               <AppNavigator />
             </NavigationContainer>
           </AppProvider>
@@ -263,13 +251,11 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
+    backgroundColor: '#0F172A', // fallback dark; dynamic bg applied via inline style
   },
 });

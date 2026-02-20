@@ -25,8 +25,9 @@ export interface Receipt {
   storeName: string;
   totalAmount: number;
   date: string;
-  items: string;
+  items?: string;
   category: string;
+  ocrText?: string;
   createdAt: string;
 }
 

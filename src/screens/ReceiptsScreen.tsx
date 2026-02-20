@@ -2,9 +2,11 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, Image, Modal, Dimensions, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { PinchGestureHandler, State } from 'react-native-gesture-handler';
+import { Animated } from 'react-native';
 import { Button, Snackbar } from 'react-native-paper';
-import { useApp } from '../context/AppContext';
-import { COLORS, SPACING, FONT_SIZES, formatMoney, formatShortDate, CATEGORIES } from '../utils/theme';
+import { useApp, useColors } from '../context/AppContext';
+import { COLORS, SPACING, FONT_SIZES, formatMoney, formatShortDate, CATEGORIES, ColorPalette } from '../utils/theme';
 import { DailyFolder, Receipt } from '../types';
 import * as db from '../services/database';
 
@@ -21,15 +23,64 @@ const getLocalDateKey = (dateInput: string | Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+
+const ZoomableImage = ({ uri }: { uri: string }) => {
+  const scale = React.useRef(new Animated.Value(1)).current;
+  const lastScale = React.useRef(1);
+
+  const onPinchEvent = Animated.event(
+    [{ nativeEvent: { scale } }],
+    { useNativeDriver: true }
+  );
+
+  const onPinchStateChange = (event: any) => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      lastScale.current *= event.nativeEvent.scale;
+      // Limit scale
+      lastScale.current = Math.max(1, Math.min(lastScale.current, 4));
+
+      scale.setValue(1);
+      scale.setOffset(lastScale.current);
+      scale.setValue(0); // This is tricky without reanimated, simplified approach:
+      // Actually, standard Animated loop is hard for pinch. 
+      // Let's use a simpler approach: restart scaling from 1 but visually apply previous scale * new scale
+    }
+  };
+
+  // Improved simple pinch logic for Android using minimal dependencies
+  // Since we can't use Reanimated easily, let's use a basic View wrapper that handles the scale prop
+  // But wait, the previous code block was just a comment. Let's implement fully.
+
+  return (
+    <PinchGestureHandler
+      onGestureEvent={onPinchEvent}
+      onHandlerStateChange={onPinchStateChange}
+    >
+      <Animated.Image
+        source={{ uri }}
+        style={[
+          { width: '100%', height: '100%' },
+          {
+            transform: [{ scale }],
+          },
+        ]}
+        resizeMode="contain"
+      />
+    </PinchGestureHandler>
+  );
+};
+
 export const ReceiptsScreen: React.FC = () => {
   const { receipts, currency, deleteReceipt, undoAction, performUndo } = useApp();
+  const COLORS = useColors();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const [selectedFolder, setSelectedFolder] = useState<DailyFolder | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [linkedExpensesCount, setLinkedExpensesCount] = useState(0);
   const [showUndoSnackbar, setShowUndoSnackbar] = useState(false);
-  const [imageHeights, setImageHeights] = useState<{[key: string]: number}>({});
+  const [imageHeights, setImageHeights] = useState<{ [key: string]: number }>({});
 
   // Show undo snackbar when undoAction is available
   useEffect(() => {
@@ -58,10 +109,10 @@ export const ReceiptsScreen: React.FC = () => {
   // PRIORITY 0 FIX: Use LOCAL date for grouping
   const dailyFolders = useMemo(() => {
     const folders = new Map<string, Receipt[]>();
-    
+
     receipts.forEach(receipt => {
-      // CRITICAL: Use local date key, not UTC
-      const localDateKey = getLocalDateKey(receipt.date);
+      // CRITICAL: Use local date key from createdAt (when it was saved)
+      const localDateKey = getLocalDateKey(receipt.createdAt);
       const existing = folders.get(localDateKey) || [];
       folders.set(localDateKey, [...existing, receipt]);
     });
@@ -101,14 +152,14 @@ export const ReceiptsScreen: React.FC = () => {
     const totalForDay = item.receipts.reduce((sum, r) => sum + r.totalAmount, 0);
     // Get first receipt with image for thumbnail
     const firstReceipt = item.receipts.find(r => r.imageUri);
-    
+
     return (
       <Pressable style={styles.folderItem} onPress={() => setSelectedFolder(item)}>
         {/* Receipt thumbnail or icon */}
         <View style={styles.folderIcon}>
           {firstReceipt?.imageUri ? (
-            <Image 
-              source={{ uri: firstReceipt.imageUri }} 
+            <Image
+              source={{ uri: firstReceipt.imageUri }}
               style={styles.folderThumbnail}
               resizeMode="cover"
             />
@@ -134,13 +185,13 @@ export const ReceiptsScreen: React.FC = () => {
 
   const renderReceipt = ({ item }: { item: Receipt }) => {
     const category = CATEGORIES.find(c => c.id === item.category);
-    
+
     return (
       <Pressable style={styles.receiptCard} onPress={() => setSelectedReceipt(item)}>
         {/* Full receipt image - no cropping */}
         {item.imageUri ? (
-          <Image 
-            source={{ uri: item.imageUri }} 
+          <Image
+            source={{ uri: item.imageUri }}
             style={styles.receiptCardImage}
             resizeMode="contain"
           />
@@ -150,7 +201,7 @@ export const ReceiptsScreen: React.FC = () => {
             <Text style={styles.noImageText}>No Image</Text>
           </View>
         )}
-        
+
         {/* Receipt info overlay at bottom */}
         <View style={styles.receiptCardInfo}>
           <View style={styles.receiptCardHeader}>
@@ -161,6 +212,9 @@ export const ReceiptsScreen: React.FC = () => {
               {formatMoney(item.totalAmount, currency)}
             </Text>
           </View>
+          <Text style={styles.receiptCardDate}>
+            {item.date ? formatShortDate(item.date) : '—'}
+          </Text>
           {category && (
             <View style={[styles.receiptCardCategory, { backgroundColor: category.color + '20' }]}>
               <MaterialIcons name={category.icon as any} size={14} color={category.color} />
@@ -213,10 +267,10 @@ export const ReceiptsScreen: React.FC = () => {
             </View>
             <View style={{ width: 40 }} />
           </View>
-          
+
           {/* Masonry Gallery - "Clean Desk" Look */}
           {selectedFolder && (
-            <ScrollView 
+            <ScrollView
               style={styles.galleryScroll}
               contentContainerStyle={styles.galleryContent}
               showsVerticalScrollIndicator={false}
@@ -227,14 +281,14 @@ export const ReceiptsScreen: React.FC = () => {
                   {selectedFolder.receipts
                     .filter((_, idx) => idx % 2 === 0)
                     .map(receipt => (
-                      <Pressable 
-                        key={receipt.id} 
+                      <Pressable
+                        key={receipt.id}
                         style={styles.receiptTile}
                         onPress={() => setSelectedReceipt(receipt)}
                       >
                         {receipt.imageUri ? (
-                          <Image 
-                            source={{ uri: receipt.imageUri }} 
+                          <Image
+                            source={{ uri: receipt.imageUri }}
                             style={[
                               styles.receiptTileImage,
                               { height: imageHeights[receipt.id] || 200 }
@@ -243,7 +297,7 @@ export const ReceiptsScreen: React.FC = () => {
                           />
                         ) : (
                           <View style={[styles.receiptTilePlaceholder, { height: 150 }]}>
-                            <MaterialIcons name="receipt" size={40} color="#CCC" />
+                            <MaterialIcons name="receipt" size={40} color={COLORS.textLight} />
                           </View>
                         )}
                         {/* Receipt Info Overlay */}
@@ -263,14 +317,14 @@ export const ReceiptsScreen: React.FC = () => {
                   {selectedFolder.receipts
                     .filter((_, idx) => idx % 2 === 1)
                     .map(receipt => (
-                      <Pressable 
-                        key={receipt.id} 
+                      <Pressable
+                        key={receipt.id}
                         style={styles.receiptTile}
                         onPress={() => setSelectedReceipt(receipt)}
                       >
                         {receipt.imageUri ? (
-                          <Image 
-                            source={{ uri: receipt.imageUri }} 
+                          <Image
+                            source={{ uri: receipt.imageUri }}
                             style={[
                               styles.receiptTileImage,
                               { height: imageHeights[receipt.id] || 220 }
@@ -279,7 +333,7 @@ export const ReceiptsScreen: React.FC = () => {
                           />
                         ) : (
                           <View style={[styles.receiptTilePlaceholder, { height: 180 }]}>
-                            <MaterialIcons name="receipt" size={40} color="#CCC" />
+                            <MaterialIcons name="receipt" size={40} color={COLORS.textLight} />
                           </View>
                         )}
                         {/* Receipt Info Overlay */}
@@ -321,14 +375,14 @@ export const ReceiptsScreen: React.FC = () => {
                 {selectedReceipt ? formatMoney(selectedReceipt.totalAmount, currency) : ''}
               </Text>
             </View>
-            <Pressable 
-              onPress={() => selectedReceipt && handleDeleteReceipt(selectedReceipt)} 
+            <Pressable
+              onPress={() => selectedReceipt && handleDeleteReceipt(selectedReceipt)}
               style={styles.fullScreenButton}
             >
               <MaterialIcons name="delete" size={28} color={COLORS.error} />
             </Pressable>
           </SafeAreaView>
-          
+
           {/* Zoomable Image Area */}
           {selectedReceipt?.imageUri ? (
             <ScrollView
@@ -341,8 +395,8 @@ export const ReceiptsScreen: React.FC = () => {
               centerContent
               bouncesZoom
             >
-              <Image 
-                source={{ uri: selectedReceipt.imageUri }} 
+              <Image
+                source={{ uri: selectedReceipt.imageUri }}
                 style={styles.fullScreenImage}
                 resizeMode="contain"
               />
@@ -357,9 +411,15 @@ export const ReceiptsScreen: React.FC = () => {
           {/* Bottom info bar */}
           <SafeAreaView style={styles.fullScreenFooter} edges={['bottom']}>
             <View style={styles.footerInfo}>
-              <MaterialIcons name="calendar-today" size={16} color="#999" />
+              <MaterialIcons name="event" size={16} color="#999" />
               <Text style={styles.footerText}>
-                {selectedReceipt ? formatShortDate(selectedReceipt.date) : ''}
+                Receipt: {selectedReceipt?.date ? formatShortDate(selectedReceipt.date) : '—'}
+              </Text>
+            </View>
+            <View style={[styles.footerInfo, { marginLeft: SPACING.md }]}>
+              <MaterialIcons name="save" size={16} color="#999" />
+              <Text style={styles.footerText}>
+                Saved: {selectedReceipt ? formatShortDate(selectedReceipt.createdAt) : ''}
               </Text>
             </View>
             <Text style={styles.footerHint}>Pinch to zoom</Text>
@@ -376,8 +436,8 @@ export const ReceiptsScreen: React.FC = () => {
                     : 'Are you sure you want to delete this receipt?'}
                 </Text>
                 <View style={styles.deleteDialogButtons}>
-                  <Button 
-                    mode="outlined" 
+                  <Button
+                    mode="outlined"
                     onPress={() => setShowDeleteDialog(false)}
                     style={styles.deleteDialogButton}
                   >
@@ -385,14 +445,14 @@ export const ReceiptsScreen: React.FC = () => {
                   </Button>
                   {linkedExpensesCount > 0 ? (
                     <>
-                      <Button 
+                      <Button
                         mode="outlined"
                         onPress={() => confirmDelete(false)}
                         style={styles.deleteDialogButton}
                       >
                         Receipt Only
                       </Button>
-                      <Button 
+                      <Button
                         mode="contained"
                         onPress={() => confirmDelete(true)}
                         buttonColor={COLORS.error}
@@ -402,7 +462,7 @@ export const ReceiptsScreen: React.FC = () => {
                       </Button>
                     </>
                   ) : (
-                    <Button 
+                    <Button
                       mode="contained"
                       onPress={() => confirmDelete(false)}
                       buttonColor={COLORS.error}
@@ -440,7 +500,7 @@ export const ReceiptsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -516,16 +576,16 @@ const styles = StyleSheet.create({
   // ======== MASONRY GALLERY STYLES ========
   galleryContainer: {
     flex: 1,
-    backgroundColor: '#F5F0E8', // Warm "clean desk" color
+    backgroundColor: COLORS.background,
   },
   galleryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
-    backgroundColor: '#FFF',
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E0D8',
+    borderBottomColor: COLORS.border,
   },
   galleryBackButton: {
     width: 40,
@@ -563,31 +623,30 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   receiptTile: {
-    backgroundColor: '#FFF',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     overflow: 'hidden',
-    // "Lying on desk" shadow
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
   receiptTileImage: {
     width: '100%',
-    backgroundColor: '#FAFAFA',
+    backgroundColor: COLORS.border,
   },
   receiptTilePlaceholder: {
     width: '100%',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   receiptTileOverlay: {
     padding: SPACING.sm,
-    backgroundColor: '#FFF',
+    backgroundColor: COLORS.surface,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: COLORS.border,
   },
   tileStoreName: {
     fontSize: FONT_SIZES.sm,
@@ -637,7 +696,7 @@ const styles = StyleSheet.create({
   receiptCardImage: {
     width: '100%',
     height: 200,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.border,
   },
   receiptCardPlaceholder: {
     width: '100%',
@@ -670,6 +729,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
     color: COLORS.primary,
+  },
+  receiptCardDate: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textLight,
+    marginTop: 2,
   },
   receiptCardCategory: {
     flexDirection: 'row',
@@ -739,7 +803,7 @@ const styles = StyleSheet.create({
   },
   noImageFullScreenText: {
     fontSize: FONT_SIZES.md,
-    color: '#666',
+    color: COLORS.textSecondary,
     marginTop: SPACING.md,
   },
   fullScreenFooter: {
@@ -757,11 +821,11 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: FONT_SIZES.sm,
-    color: '#999',
+    color: COLORS.textSecondary,
   },
   footerHint: {
     fontSize: FONT_SIZES.xs,
-    color: '#666',
+    color: COLORS.textLight,
     fontStyle: 'italic',
   },
 

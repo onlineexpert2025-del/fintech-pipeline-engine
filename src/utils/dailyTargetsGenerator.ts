@@ -4,7 +4,7 @@
  */
 
 import { DailyTarget } from '../types';
-import { saveDailyTarget, getMonthlyTargets } from '../services/database';
+import { saveDailyTarget, getMonthlyTargets, getDailyTarget } from '../services/database';
 
 /**
  * Generate variable daily targets for a month
@@ -25,14 +25,14 @@ export const generateMonthlyTargets = async (
 
   // Get number of days in month
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  
+
   // Calculate average per day
   const avgPerDay = monthlyTarget / daysInMonth;
-  
+
   // Generate random distribution with 3 difficulty levels
   const dailyAmounts: number[] = [];
   let remaining = monthlyTarget;
-  
+
   // Define difficulty multipliers
   const EASY_MIN = 0.1; // 10% of average
   const EASY_MAX = 0.5; // 50% of average
@@ -40,12 +40,12 @@ export const generateMonthlyTargets = async (
   const MEDIUM_MAX = 1.2;
   const HARD_MIN = 1.3;
   const HARD_MAX = 2.5; // 250% of average
-  
+
   // Generate targets for all days except last
   for (let day = 1; day < daysInMonth; day++) {
     const random = Math.random();
     let multiplier: number;
-    
+
     // 30% easy, 50% medium, 20% hard
     if (random < 0.3) {
       // Easy day
@@ -57,21 +57,21 @@ export const generateMonthlyTargets = async (
       // Hard day
       multiplier = HARD_MIN + Math.random() * (HARD_MAX - HARD_MIN);
     }
-    
+
     let amount = Math.round(avgPerDay * multiplier * 100) / 100; // Round to 2 decimals
-    
+
     // Ensure we don't exceed remaining
     if (amount > remaining - (daysInMonth - day)) {
       amount = Math.max(remaining / 2, remaining / (daysInMonth - day + 1));
     }
-    
+
     dailyAmounts.push(amount);
     remaining -= amount;
   }
-  
+
   // Last day gets the remaining amount (ensures perfect sum)
   dailyAmounts.push(Math.round(remaining * 100) / 100);
-  
+
   // Verify sum equals monthly target (allow 0.01 tolerance for rounding)
   const sum = dailyAmounts.reduce((a, b) => a + b, 0);
   if (Math.abs(sum - monthlyTarget) > 0.01) {
@@ -79,19 +79,19 @@ export const generateMonthlyTargets = async (
     // Adjust last day to fix rounding errors
     dailyAmounts[daysInMonth - 1] += (monthlyTarget - sum);
   }
-  
+
   // Save targets to database
   const targets: DailyTarget[] = [];
   for (let day = 1; day <= daysInMonth; day++) {
     const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const targetAmount = dailyAmounts[day - 1];
-    
+
     await saveDailyTarget({
       date,
       targetAmount,
       achieved: false
     });
-    
+
     targets.push({
       id: day,
       date,
@@ -100,10 +100,10 @@ export const generateMonthlyTargets = async (
       createdAt: new Date().toISOString()
     });
   }
-  
+
   console.log('[DailyTargets] Generated', daysInMonth, 'targets for', year, month);
   console.log('[DailyTargets] Total:', targets.reduce((a, b) => a + b.targetAmount, 0));
-  
+
   return targets;
 };
 
@@ -115,12 +115,11 @@ export const getTodayTarget = async (monthlyTarget: number): Promise<DailyTarget
   const year = today.getFullYear();
   const month = today.getMonth();
   const dateStr = today.toISOString().split('T')[0];
-  
+
   // Ensure monthly targets are generated
   await generateMonthlyTargets(monthlyTarget, year, month);
-  
+
   // Get today's target from database
-  const { getDailyTarget } = await import('../services/database');
   return await getDailyTarget(dateStr);
 };
 
@@ -136,7 +135,7 @@ export const checkTodayTargetAchieved = async (todaySavings: number, todayTarget
  */
 export const getDifficultyLabel = (amount: number, avgAmount: number): string => {
   const ratio = amount / avgAmount;
-  
+
   if (ratio < 0.6) return 'Easy';
   if (ratio < 1.3) return 'Medium';
   return 'Hard';

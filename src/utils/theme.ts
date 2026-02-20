@@ -1,20 +1,50 @@
-export const COLORS = {
-  primary: '#10B981',
-  primaryDark: '#059669',
-  primaryLight: '#D1FAE5',
+export type ColorPalette = typeof DARK_COLORS;
+
+export const DARK_COLORS = {
+  primary: '#14B8A6',       // Teal
+  primaryDark: '#0F766E',   // Dark Teal
+  primaryLight: '#CCFBF1',
   secondary: '#3B82F6',
-  secondaryLight: '#DBEAFE',
-  background: '#F8FAFC',
-  surface: '#FFFFFF',
-  text: '#1E293B',
-  textSecondary: '#64748B',
-  textLight: '#94A3B8',
-  border: '#E2E8F0',
+  secondaryLight: '#1E293B',
+  background: '#0F172A',    // Dark Slate
+  backgroundEnd: '#0B3B36', // Deep Teal
+  surface: '#1E293B',       // Card surface
+  text: '#F8FAFC',
+  textSecondary: '#94A3B8',
+  textLight: '#64748B',
+  border: '#334155',
   error: '#EF4444',
-  success: '#10B981',
+  success: '#22C55E',
   warning: '#F59E0B',
   white: '#FFFFFF',
+  cardGradientStart: '#1E293B',
+  cardGradientEnd: '#1E293B',
 };
+
+export const LIGHT_COLORS: ColorPalette = {
+  primary: '#0D9488',       // Deeper teal for contrast on white
+  primaryDark: '#0F766E',
+  primaryLight: '#CCFBF1',
+  secondary: '#2563EB',
+  secondaryLight: '#DBEAFE',
+  background: '#F1F5F9',    // Slate 100
+  backgroundEnd: '#E0F2FE', // Light blue tint
+  surface: '#FFFFFF',       // Pure white cards
+  text: '#0F172A',          // Dark slate
+  textSecondary: '#475569', // Slate 600
+  textLight: '#94A3B8',     // Slate 400
+  border: '#E2E8F0',        // Slate 200
+  error: '#DC2626',
+  success: '#16A34A',
+  warning: '#D97706',
+  white: '#FFFFFF',
+  cardGradientStart: '#FFFFFF',
+  cardGradientEnd: '#FFFFFF',
+};
+
+// Backward compat: COLORS always refers to the dark palette.
+// Screens that support theming should use useColors() hook from AppContext instead.
+export const COLORS = DARK_COLORS;
 
 export const SPACING = {
   xs: 4,

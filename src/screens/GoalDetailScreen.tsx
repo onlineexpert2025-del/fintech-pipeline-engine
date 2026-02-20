@@ -10,7 +10,7 @@ import { COLORS, SPACING, FONT_SIZES, formatMoney } from '../utils/theme';
 export const GoalDetailScreen: React.FC = () => {
   const navigation = useNavigation();
   const { goal, stats, updateGoal, setGoal, currency = 'USD' } = useApp();
-  
+
   const [isEditing, setIsEditing] = useState(!goal);
   const [name, setName] = useState(goal?.name || '');
   const [targetAmount, setTargetAmount] = useState(goal?.targetAmount?.toString() || '');
@@ -19,8 +19,8 @@ export const GoalDetailScreen: React.FC = () => {
 
   const progress = goal ? Math.min((stats.totalSaved / goal.targetAmount) * 100, 100) : 0;
   const remaining = goal ? Math.max(goal.targetAmount - stats.totalSaved, 0) : 0;
-  const monthsToGoal = goal && goal.monthlySavingsTarget > 0 
-    ? Math.ceil(remaining / goal.monthlySavingsTarget) 
+  const monthsToGoal = goal && goal.monthlySavingsTarget > 0
+    ? Math.ceil(remaining / goal.monthlySavingsTarget)
     : 0;
 
   const isAhead = goal && stats.totalSaved >= (goal.monthlySavingsTarget * getMonthsElapsed());
@@ -34,7 +34,7 @@ export const GoalDetailScreen: React.FC = () => {
 
   const handleSave = async () => {
     if (!name.trim() || !targetAmount || !monthlySavings) return;
-    
+
     setLoading(true);
     try {
       if (goal) {
@@ -140,7 +140,7 @@ export const GoalDetailScreen: React.FC = () => {
         {/* Goal Progress Card */}
         <View style={styles.progressCard}>
           <Text style={styles.goalName}>{goal?.name}</Text>
-          
+
           <View style={styles.progressCircleContainer}>
             <View style={styles.progressCircle}>
               <Text style={styles.progressPercent}>{progress.toFixed(0)}%</Text>
@@ -160,19 +160,19 @@ export const GoalDetailScreen: React.FC = () => {
             <Text style={styles.statLabel}>Total Saved</Text>
             <Text style={styles.statValue}>{formatMoney(stats.totalSaved, currency)}</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <MaterialIcons name="flag" size={24} color={COLORS.secondary} />
             <Text style={styles.statLabel}>Target</Text>
             <Text style={styles.statValue}>{formatMoney(goal?.targetAmount || 0, currency)}</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <MaterialIcons name="trending-up" size={24} color={COLORS.warning} />
             <Text style={styles.statLabel}>Remaining</Text>
             <Text style={styles.statValue}>{formatMoney(remaining, currency)}</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <MaterialIcons name="calendar-today" size={24} color={COLORS.error} />
             <Text style={styles.statLabel}>Monthly Target</Text>
@@ -193,10 +193,10 @@ export const GoalDetailScreen: React.FC = () => {
 
         {/* Status Card */}
         <View style={[styles.statusCard, isAhead ? styles.aheadCard : styles.behindCard]}>
-          <MaterialIcons 
-            name={isAhead ? 'trending-up' : 'trending-down'} 
-            size={24} 
-            color={isAhead ? COLORS.primary : COLORS.error} 
+          <MaterialIcons
+            name={isAhead ? 'trending-up' : 'trending-down'}
+            size={24}
+            color={isAhead ? COLORS.primary : COLORS.error}
           />
           <Text style={[styles.statusText, isAhead ? styles.aheadText : styles.behindText]}>
             {isAhead ? "You're ahead of schedule! 🎉" : "You're behind schedule. Keep going! 💪"}
@@ -373,10 +373,10 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
   },
   aheadCard: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: COLORS.primary + '25',
   },
   behindCard: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: COLORS.error + '25',
   },
   statusText: {
     flex: 1,
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   aheadText: {
-    color: COLORS.primaryDark,
+    color: COLORS.primary,
   },
   behindText: {
     color: COLORS.error,

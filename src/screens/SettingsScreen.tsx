@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Modal, Platform, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
@@ -20,13 +21,14 @@ try {
   }
 }
 import Constants from 'expo-constants';
-import { useApp } from '../context/AppContext';
-import { COLORS, SPACING, FONT_SIZES, formatMoney, getCurrencyByCode } from '../utils/theme';
+import { useApp, useColors } from '../context/AppContext';
+import { SPACING, FONT_SIZES, formatMoney, getCurrencyByCode } from '../utils/theme';
 import { setSystemInteraction } from '../utils/systemInteraction';
 
 export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { goal, stats, transactions, receipts, currency, clearAllData, refreshData, setGoal, addTransaction, addReceipt, setCurrency } = useApp();
+  const { goal, stats, transactions, receipts, currency, clearAllData, refreshData, setGoal, addTransaction, addReceipt, setCurrency, isDarkMode, toggleTheme } = useApp();
+  const COLORS = useColors();
   const [versionModalVisible, setVersionModalVisible] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
@@ -96,14 +98,14 @@ export const SettingsScreen: React.FC = () => {
   const handleExportData = async () => {
     if (isExporting) return;
     setIsExporting(true);
-    
+
     // FIX #7: Set system interaction flag to prevent biometric lock
     setSystemInteraction(true);
 
     try {
       // Generate CSV content
       let csvContent = 'Type,Amount,Category,Source,Notes,Date\n';
-      
+
       transactions.forEach(t => {
         const row = [
           t.type,
@@ -132,7 +134,7 @@ export const SettingsScreen: React.FC = () => {
 
       const date = new Date().toISOString().split('T')[0];
       const fileName = `goalpulse_export_${date}.csv`;
-      
+
       if (Platform.OS === 'web') {
         // Web: trigger download
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -146,7 +148,7 @@ export const SettingsScreen: React.FC = () => {
         if (!FileSystem) {
           throw new Error('FileSystem module not available');
         }
-        
+
         const filePath = `${FileSystem.documentDirectory}${fileName}`;
         await FileSystem.writeAsStringAsync(filePath, csvContent, {
           encoding: 'utf8',
@@ -175,7 +177,7 @@ export const SettingsScreen: React.FC = () => {
   const handleBackup = async () => {
     // FIX #7: Set system interaction flag to prevent biometric lock
     setSystemInteraction(true);
-    
+
     try {
       const backupData = {
         version: '1.0',
@@ -201,7 +203,7 @@ export const SettingsScreen: React.FC = () => {
         if (!FileSystem) {
           throw new Error('FileSystem module not available');
         }
-        
+
         const filePath = `${FileSystem.documentDirectory}${fileName}`;
         await FileSystem.writeAsStringAsync(filePath, jsonContent, {
           encoding: 'utf8',
@@ -229,14 +231,14 @@ export const SettingsScreen: React.FC = () => {
   const handleRestore = async () => {
     // FIX #7: Set system interaction flag to prevent biometric lock
     setSystemInteraction(true);
-    
+
     try {
       if (!FileSystem) {
         Alert.alert('Error', 'File system not available on this platform');
         setSystemInteraction(false);
         return;
       }
-      
+
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/json',
         copyToCacheDirectory: true,
@@ -271,7 +273,7 @@ export const SettingsScreen: React.FC = () => {
               try {
                 // Clear current data first
                 await clearAllData();
-                
+
                 // Restore goal if exists
                 if (backupData.goal) {
                   await setGoal({
@@ -281,26 +283,26 @@ export const SettingsScreen: React.FC = () => {
                     deadline: backupData.goal.deadline || null,
                   });
                 }
-                
+
                 // Restore transactions
                 if (backupData.transactions && Array.isArray(backupData.transactions)) {
                   for (const transaction of backupData.transactions) {
                     await addTransaction(transaction);
                   }
                 }
-                
+
                 // Restore receipts
                 if (backupData.receipts && Array.isArray(backupData.receipts)) {
                   for (const receipt of backupData.receipts) {
                     await addReceipt(receipt);
                   }
                 }
-                
+
                 // Restore currency setting
                 if (backupData.currency) {
                   await setCurrency(backupData.currency);
                 }
-                
+
                 Alert.alert('Restore Complete', `Successfully restored ${backupData.transactions?.length || 0} transactions and ${backupData.receipts?.length || 0} receipts.`);
               } catch (err) {
                 const errorMsg = err instanceof Error ? err.message : String(err);
@@ -340,6 +342,42 @@ export const SettingsScreen: React.FC = () => {
     setVersionModalVisible(true);
   };
 
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: COLORS.background },
+    profileCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, margin: SPACING.lg, borderRadius: 16, padding: SPACING.lg },
+    avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.primaryLight + '30', alignItems: 'center', justifyContent: 'center' },
+    profileInfo: { marginLeft: SPACING.md, flex: 1 },
+    profileName: { fontSize: FONT_SIZES.lg, fontWeight: '600', color: COLORS.text },
+    profileGoal: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },
+    statsCard: { flexDirection: 'row', backgroundColor: COLORS.surface, marginHorizontal: SPACING.lg, borderRadius: 12, padding: SPACING.md },
+    statItem: { flex: 1, alignItems: 'center' },
+    statDivider: { width: 1, backgroundColor: COLORS.border },
+    statValue: { fontSize: FONT_SIZES.lg, fontWeight: '600', color: COLORS.text },
+    statLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: SPACING.xs },
+    sectionTitle: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textSecondary, marginHorizontal: SPACING.lg, marginTop: SPACING.lg, marginBottom: SPACING.sm },
+    settingsGroup: { backgroundColor: COLORS.surface, marginHorizontal: SPACING.lg, borderRadius: 12, overflow: 'hidden' },
+    settingItem: { flexDirection: 'row', alignItems: 'center', padding: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    settingIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primaryLight + '30', alignItems: 'center', justifyContent: 'center' },
+    dangerIcon: { backgroundColor: COLORS.error + '25' },
+    settingInfo: { flex: 1, marginLeft: SPACING.md },
+    settingTitle: { fontSize: FONT_SIZES.md, fontWeight: '500', color: COLORS.text },
+    dangerText: { color: COLORS.error },
+    settingSubtitle: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
+    footer: { alignItems: 'center', paddingVertical: SPACING.xl },
+    footerText: { fontSize: FONT_SIZES.md, fontWeight: '600', color: COLORS.textSecondary },
+    footerSubtext: { fontSize: FONT_SIZES.sm, color: COLORS.textLight, marginTop: SPACING.xs },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+    modalContent: { backgroundColor: COLORS.surface, borderRadius: 16, padding: SPACING.lg, width: '85%', maxWidth: 340 },
+    modalHeader: { alignItems: 'center', marginBottom: SPACING.lg },
+    modalTitle: { fontSize: FONT_SIZES.xl, fontWeight: '600', color: COLORS.text, marginTop: SPACING.sm },
+    modalBody: { marginBottom: SPACING.lg },
+    infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    infoLabel: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary },
+    infoValue: { fontSize: FONT_SIZES.md, fontWeight: '500', color: COLORS.text },
+    modalButton: { backgroundColor: COLORS.primary, borderRadius: 12, padding: SPACING.md, alignItems: 'center' },
+    modalButtonText: { color: COLORS.white, fontSize: FONT_SIZES.md, fontWeight: '600' },
+  }), [COLORS]);
+
   const SettingItem = ({ icon, title, subtitle, onPress, danger = false, showChevron = true }: {
     icon: string;
     title: string;
@@ -361,355 +399,195 @@ export const SettingsScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Profile Summary */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <MaterialIcons name="person" size={40} color={COLORS.primary} />
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>My Finances</Text>
-            <Text style={styles.profileGoal}>
-              Goal: {goal?.name || 'Not set'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Stats Overview */}
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{transactions.length}</Text>
-            <Text style={styles.statLabel}>Transactions</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{receipts.length}</Text>
-            <Text style={styles.statLabel}>Receipts</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: COLORS.primary }]}>
-              {formatMoney(stats.totalSaved, currency)}
-            </Text>
-            <Text style={styles.statLabel}>Saved</Text>
-          </View>
-        </View>
-
-        {/* Settings Sections */}
-        <Text style={styles.sectionTitle}>General</Text>
-        <View style={styles.settingsGroup}>
-          <SettingItem
-            icon="attach-money"
-            title="Currency"
-            subtitle={`${currencyInfo.code} (${currencyInfo.symbol})`}
-            onPress={() => navigation.navigate('Currency')}
-          />
-          <SettingItem
-            icon="notifications"
-            title="Notifications"
-            subtitle="Reminders & alerts"
-            onPress={() => navigation.navigate('Notifications')}
-          />
-        </View>
-
-        <Text style={styles.sectionTitle}>Security</Text>
-        <View style={styles.settingsGroup}>
-          <View style={styles.settingItem}>
-            <View style={[styles.iconContainer, { backgroundColor: COLORS.primary + '20' }]}>
-              <MaterialIcons name="fingerprint" size={24} color={COLORS.primary} />
+    <LinearGradient colors={[COLORS.background, COLORS.backgroundEnd]} style={{ flex: 1 }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['bottom']}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Profile Summary */}
+          <View style={styles.profileCard}>
+            <View style={styles.avatar}>
+              <MaterialIcons name="person" size={40} color={COLORS.primary} />
             </View>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Biometric Lock</Text>
-              <Text style={styles.settingSubtitle}>
-                {biometricAvailable ? 'Require Face ID/Fingerprint to open' : 'Not available on this device'}
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>My Finances</Text>
+              <Text style={styles.profileGoal}>
+                Goal: {goal?.name || 'Not set'}
               </Text>
             </View>
-            <Switch
-              value={biometricEnabled}
-              onValueChange={handleBiometricToggle}
-              disabled={!biometricAvailable}
-              trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
-              thumbColor={biometricEnabled ? COLORS.primary : COLORS.textLight}
+          </View>
+
+          {/* Stats Overview */}
+          <View style={styles.statsCard}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{transactions.length}</Text>
+              <Text style={styles.statLabel}>Transactions</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{receipts.length}</Text>
+              <Text style={styles.statLabel}>Receipts</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: COLORS.primary }]}>
+                {formatMoney(stats.totalSaved, currency)}
+              </Text>
+              <Text style={styles.statLabel}>Saved</Text>
+            </View>
+          </View>
+
+          {/* Settings Sections */}
+          <Text style={styles.sectionTitle}>General</Text>
+          <View style={styles.settingsGroup}>
+            <SettingItem
+              icon="attach-money"
+              title="Currency"
+              subtitle={`${currencyInfo.code} (${currencyInfo.symbol})`}
+              onPress={() => navigation.navigate('Currency')}
+            />
+            <SettingItem
+              icon="notifications"
+              title="Notifications"
+              subtitle="Reminders & alerts"
+              onPress={() => navigation.navigate('Notifications')}
+            />
+            {/* Theme Toggle */}
+            <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
+              <View style={[styles.settingIcon, { backgroundColor: COLORS.primaryLight + '30' }]}>
+                <MaterialIcons name={isDarkMode ? 'dark-mode' : 'light-mode'} size={24} color={COLORS.primary} />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>{isDarkMode ? 'Dark Mode' : 'Light Mode'}</Text>
+                <Text style={styles.settingSubtitle}>Toggle app theme</Text>
+              </View>
+              <Switch
+                value={isDarkMode}
+                onValueChange={toggleTheme}
+                trackColor={{ false: COLORS.border, true: COLORS.primary + '80' }}
+                thumbColor={isDarkMode ? COLORS.primary : COLORS.textLight}
+              />
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>Security</Text>
+          <View style={styles.settingsGroup}>
+            <View style={styles.settingItem}>
+              <View style={[styles.settingIcon, { backgroundColor: COLORS.primary + '20' }]}>
+                <MaterialIcons name="fingerprint" size={24} color={COLORS.primary} />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Biometric Lock</Text>
+                <Text style={styles.settingSubtitle}>
+                  {biometricAvailable ? 'Require Face ID/Fingerprint to open' : 'Not available on this device'}
+                </Text>
+              </View>
+              <Switch
+                value={biometricEnabled}
+                onValueChange={handleBiometricToggle}
+                disabled={!biometricAvailable}
+                trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
+                thumbColor={biometricEnabled ? COLORS.primary : COLORS.textLight}
+              />
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>Data</Text>
+          <View style={styles.settingsGroup}>
+            <SettingItem
+              icon="file-download"
+              title="Export Data"
+              subtitle={isExporting ? 'Exporting...' : 'Download as CSV'}
+              onPress={handleExportData}
+            />
+            <SettingItem
+              icon="backup"
+              title="Backup"
+              subtitle="Save to JSON file"
+              onPress={handleBackup}
+            />
+            <SettingItem
+              icon="restore"
+              title="Restore"
+              subtitle="Import from backup file"
+              onPress={handleRestore}
             />
           </View>
-        </View>
 
-        <Text style={styles.sectionTitle}>Data</Text>
-        <View style={styles.settingsGroup}>
-          <SettingItem
-            icon="file-download"
-            title="Export Data"
-            subtitle={isExporting ? 'Exporting...' : 'Download as CSV'}
-            onPress={handleExportData}
-          />
-          <SettingItem
-            icon="backup"
-            title="Backup"
-            subtitle="Save to JSON file"
-            onPress={handleBackup}
-          />
-          <SettingItem
-            icon="restore"
-            title="Restore"
-            subtitle="Import from backup file"
-            onPress={handleRestore}
-          />
-        </View>
-
-        <Text style={styles.sectionTitle}>About</Text>
-        <View style={styles.settingsGroup}>
-          <SettingItem
-            icon="info"
-            title="App Version"
-            subtitle="1.0.0"
-            onPress={showVersionInfo}
-          />
-          <SettingItem
-            icon="privacy-tip"
-            title="Privacy Policy"
-            onPress={() => navigation.navigate('PrivacyPolicy')}
-          />
-          <SettingItem
-            icon="description"
-            title="Terms of Service"
-            onPress={() => navigation.navigate('Terms')}
-          />
-        </View>
-
-        <Text style={styles.sectionTitle}>Danger Zone</Text>
-        <View style={styles.settingsGroup}>
-          <SettingItem
-            icon="delete-forever"
-            title="Clear All Data"
-            subtitle="Delete all transactions and receipts"
-            onPress={handleClearData}
-            danger
-          />
-        </View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>GoalPulse</Text>
-          <Text style={styles.footerSubtext}>Your Personal Savings Tracker</Text>
-        </View>
-      </ScrollView>
-
-      {/* Version Modal */}
-      <Modal
-        visible={versionModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setVersionModalVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setVersionModalVisible(false)}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <MaterialIcons name="info" size={40} color={COLORS.primary} />
-              <Text style={styles.modalTitle}>GoalPulse</Text>
-            </View>
-            <View style={styles.modalBody}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Version</Text>
-                <Text style={styles.infoValue}>1.0.0</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Build</Text>
-                <Text style={styles.infoValue}>{Constants.expoConfig?.version || '1.0.0'}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Platform</Text>
-                <Text style={styles.infoValue}>{Platform.OS}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>SDK</Text>
-                <Text style={styles.infoValue}>{Constants.expoConfig?.sdkVersion || 'N/A'}</Text>
-              </View>
-            </View>
-            <Pressable style={styles.modalButton} onPress={() => setVersionModalVisible(false)}>
-              <Text style={styles.modalButtonText}>Close</Text>
-            </Pressable>
+          <Text style={styles.sectionTitle}>About</Text>
+          <View style={styles.settingsGroup}>
+            <SettingItem
+              icon="info"
+              title="App Version"
+              subtitle="1.0.0"
+              onPress={showVersionInfo}
+            />
+            <SettingItem
+              icon="privacy-tip"
+              title="Privacy Policy"
+              onPress={() => navigation.navigate('PrivacyPolicy')}
+            />
+            <SettingItem
+              icon="description"
+              title="Terms of Service"
+              onPress={() => navigation.navigate('Terms')}
+            />
           </View>
-        </Pressable>
-      </Modal>
-    </SafeAreaView>
+
+          <Text style={styles.sectionTitle}>Danger Zone</Text>
+          <View style={styles.settingsGroup}>
+            <SettingItem
+              icon="delete-forever"
+              title="Clear All Data"
+              subtitle="Delete all transactions and receipts"
+              onPress={handleClearData}
+              danger
+            />
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>GoalPulse</Text>
+            <Text style={styles.footerSubtext}>Your Personal Savings Tracker</Text>
+          </View>
+        </ScrollView>
+
+        {/* Version Modal */}
+        <Modal
+          visible={versionModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setVersionModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setVersionModalVisible(false)}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <MaterialIcons name="info" size={40} color={COLORS.primary} />
+                <Text style={styles.modalTitle}>GoalPulse</Text>
+              </View>
+              <View style={styles.modalBody}>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Version</Text>
+                  <Text style={styles.infoValue}>1.0.0</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Build</Text>
+                  <Text style={styles.infoValue}>{Constants.expoConfig?.version || '1.0.0'}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Platform</Text>
+                  <Text style={styles.infoValue}>{Platform.OS}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>SDK</Text>
+                  <Text style={styles.infoValue}>{Constants.expoConfig?.sdkVersion || 'N/A'}</Text>
+                </View>
+              </View>
+              <Pressable style={styles.modalButton} onPress={() => setVersionModalVisible(false)}>
+                <Text style={styles.modalButtonText}>Close</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Modal>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    margin: SPACING.lg,
-    borderRadius: 16,
-    padding: SPACING.lg,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileInfo: {
-    marginLeft: SPACING.md,
-    flex: 1,
-  },
-  profileName: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  profileGoal: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
-  },
-  statsCard: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.surface,
-    marginHorizontal: SPACING.lg,
-    borderRadius: 12,
-    padding: SPACING.md,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: COLORS.border,
-  },
-  statValue: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  statLabel: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
-  },
-  sectionTitle: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.sm,
-  },
-  settingsGroup: {
-    backgroundColor: COLORS.surface,
-    marginHorizontal: SPACING.lg,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  settingIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dangerIcon: {
-    backgroundColor: '#FEE2E2',
-  },
-  settingInfo: {
-    flex: 1,
-    marginLeft: SPACING.md,
-  },
-  settingTitle: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '500',
-    color: COLORS.text,
-  },
-  dangerText: {
-    color: COLORS.error,
-  },
-  settingSubtitle: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: SPACING.xl,
-  },
-  footerText: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-  },
-  footerSubtext: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textLight,
-    marginTop: SPACING.xs,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: SPACING.lg,
-    width: '85%',
-    maxWidth: 340,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-  },
-  modalTitle: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginTop: SPACING.sm,
-  },
-  modalBody: {
-    marginBottom: SPACING.lg,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  infoLabel: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.textSecondary,
-  },
-  infoValue: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '500',
-    color: COLORS.text,
-  },
-  modalButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    padding: SPACING.md,
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-  },
-});

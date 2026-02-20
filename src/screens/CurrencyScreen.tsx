@@ -1,19 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useApp } from '../context/AppContext';
-import { COLORS, SPACING, FONT_SIZES, CURRENCIES, Currency } from '../utils/theme';
+import { useApp, useColors } from '../context/AppContext';
+import { SPACING, FONT_SIZES, CURRENCIES, Currency, ColorPalette } from '../utils/theme';
 
 export const CurrencyScreen: React.FC = () => {
   const navigation = useNavigation();
   const { currency, setCurrency } = useApp();
+  const COLORS = useColors();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredCurrencies = CURRENCIES.filter(
     c => c.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-         c.name.toLowerCase().includes(searchQuery.toLowerCase())
+      c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSelect = async (selected: Currency) => {
@@ -71,7 +73,7 @@ export const CurrencyScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

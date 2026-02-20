@@ -76,13 +76,17 @@ export const scheduleDailyReminder = async (hour: number = 20, minute: number = 
         hour: hour,
         minute: minute,
         repeats: true,
-      },
+      } as any,
     });
 
     console.log('[Notifications] Daily reminder scheduled:', identifier);
     return identifier;
   } catch (error) {
     console.error('[Notifications] Failed to schedule daily reminder:', error);
+    // Log specifics if available
+    if (error && typeof error === 'object' && 'message' in error) {
+      console.error('Error message:', (error as any).message);
+    }
     return null;
   }
 };

@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS, SPACING, FONT_SIZES } from '../utils/theme';
+import { useColors } from '../context/AppContext';
+import { SPACING, FONT_SIZES, ColorPalette } from '../utils/theme';
 
 export const PrivacyPolicyScreen: React.FC = () => {
+  const COLORS = useColors();
+  const styles = useMemo(() => createStyles(COLORS), [COLORS]);
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ScrollView 
+      <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
@@ -14,14 +18,14 @@ export const PrivacyPolicyScreen: React.FC = () => {
 
         <Text style={styles.sectionTitle}>Introduction</Text>
         <Text style={styles.paragraph}>
-          GoalPulse ("we", "our", or "us") is committed to protecting your privacy. 
-          This Privacy Policy explains how we collect, use, and safeguard your information 
+          GoalPulse ("we", "our", or "us") is committed to protecting your privacy.
+          This Privacy Policy explains how we collect, use, and safeguard your information
           when you use our mobile application.
         </Text>
 
         <Text style={styles.sectionTitle}>Information We Collect</Text>
         <Text style={styles.paragraph}>
-          GoalPulse stores all data locally on your device. We do not collect, transmit, 
+          GoalPulse stores all data locally on your device. We do not collect, transmit,
           or store any personal information on external servers. The data stored includes:
         </Text>
         <Text style={styles.bulletPoint}>• Financial goals and targets you set</Text>
@@ -31,53 +35,53 @@ export const PrivacyPolicyScreen: React.FC = () => {
 
         <Text style={styles.sectionTitle}>Data Storage</Text>
         <Text style={styles.paragraph}>
-          All your financial data is stored exclusively on your device using secure local 
-          storage. We do not have access to your data, and it is never uploaded to any 
+          All your financial data is stored exclusively on your device using secure local
+          storage. We do not have access to your data, and it is never uploaded to any
           cloud service unless you explicitly choose to backup using third-party services.
         </Text>
 
         <Text style={styles.sectionTitle}>Camera & Photo Access</Text>
         <Text style={styles.paragraph}>
-          GoalPulse requests camera access solely for scanning receipts. Photos are 
-          processed locally on your device and are not transmitted anywhere. You can 
+          GoalPulse requests camera access solely for scanning receipts. Photos are
+          processed locally on your device and are not transmitted anywhere. You can
           deny camera access, but the receipt scanning feature will not function.
         </Text>
 
         <Text style={styles.sectionTitle}>Third-Party Services</Text>
         <Text style={styles.paragraph}>
-          Our app does not integrate with any third-party analytics, advertising, or 
+          Our app does not integrate with any third-party analytics, advertising, or
           tracking services. Your usage data remains private and is not shared.
         </Text>
 
         <Text style={styles.sectionTitle}>Data Export & Backup</Text>
         <Text style={styles.paragraph}>
-          You can export your data as CSV or JSON files. These exports are generated 
-          locally and shared using your device's built-in sharing functionality. We do 
+          You can export your data as CSV or JSON files. These exports are generated
+          locally and shared using your device's built-in sharing functionality. We do
           not receive copies of your exported data.
         </Text>
 
         <Text style={styles.sectionTitle}>Security</Text>
         <Text style={styles.paragraph}>
-          We implement industry-standard security measures to protect your locally stored 
-          data. However, please ensure your device is secured with a passcode or biometric 
+          We implement industry-standard security measures to protect your locally stored
+          data. However, please ensure your device is secured with a passcode or biometric
           authentication for additional protection.
         </Text>
 
         <Text style={styles.sectionTitle}>Children's Privacy</Text>
         <Text style={styles.paragraph}>
-          GoalPulse is not intended for children under 13. We do not knowingly collect 
+          GoalPulse is not intended for children under 13. We do not knowingly collect
           information from children under 13 years of age.
         </Text>
 
         <Text style={styles.sectionTitle}>Changes to This Policy</Text>
         <Text style={styles.paragraph}>
-          We may update this Privacy Policy from time to time. We will notify you of any 
+          We may update this Privacy Policy from time to time. We will notify you of any
           changes by updating the "Last Updated" date at the top of this policy.
         </Text>
 
         <Text style={styles.sectionTitle}>Contact Us</Text>
         <Text style={styles.paragraph}>
-          If you have questions about this Privacy Policy, please contact us through the 
+          If you have questions about this Privacy Policy, please contact us through the
           app's feedback feature or visit our website.
         </Text>
 
@@ -89,7 +93,7 @@ export const PrivacyPolicyScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: ColorPalette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

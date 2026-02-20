@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as db from '../services/database';
 import { Goal, Transaction, Receipt, AppStats, CategorySummary, DailyTarget } from '../types';
-import { CATEGORIES } from '../utils/theme';
+import { CATEGORIES, DARK_COLORS, LIGHT_COLORS, ColorPalette } from '../utils/theme';
 import { getTodayTarget, checkTodayTargetAchieved } from '../utils/dailyTargetsGenerator';
 
 type UndoAction = {
@@ -13,6 +14,7 @@ type UndoAction = {
 interface AppContextType {
   isLoading: boolean;
   isSetupComplete: boolean;
+  isDarkMode: boolean;
   goal: Goal | null;
   transactions: Transaction[];
   receipts: Receipt[];
@@ -34,6 +36,7 @@ interface AppContextType {
   setCurrency: (code: string) => Promise<void>;
   clearAllData: () => Promise<void>;
   refreshDailyTarget: () => Promise<void>;
+  toggleTheme: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -41,6 +44,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true); // default: dark
   const [goal, setGoalState] = useState<Goal | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -99,7 +103,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (goalData && goalData.monthlySavingsTarget > 0) {
         const target = await getTodayTarget(goalData.monthlySavingsTarget);
         setTodayTarget(target);
-        
+
         // Check if today's target is achieved
         if (target) {
           const todaySavings = stats.totalSaved - stats.todaySpending;
@@ -124,7 +128,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         db.getReceipts(),
         db.getSetting('currency'),
       ]);
-      
+
       setGoalState(goalData);
       setTransactions(transactionsData);
       setReceipts(receiptsData);
@@ -154,6 +158,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [refreshData]);
 
   useEffect(() => {
+    // Load persisted theme preference
+    AsyncStorage.getItem('isDarkMode').then(val => {
+      if (val !== null) setIsDarkMode(val === 'true');
+    }).catch(() => { });
     initialize();
   }, [initialize]);
 
@@ -185,10 +193,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (transaction) {
         setUndoAction({ type: 'transaction', data: transaction });
       }
-      
+
       // Wait for database deletion to complete
       await db.deleteTransaction(id);
-      
+
       // Only refresh UI after DB confirms deletion
       await refreshData();
     } catch (error) {
@@ -214,13 +222,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Store for undo BEFORE deleting
       const receipt = receipts.find(r => r.id === id);
       let linkedTransactions: Transaction[] = [];
-      
+
       if (receipt) {
         linkedTransactions = await db.getTransactionsByReceiptId(id);
-        setUndoAction({ 
-          type: 'receipt', 
-          data: receipt, 
-          relatedData: linkedTransactions 
+        setUndoAction({
+          type: 'receipt',
+          data: receipt,
+          relatedData: linkedTransactions
         });
       }
 
@@ -233,7 +241,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // Wait for receipt deletion to complete
       await db.deleteReceipt(id);
-      
+
       // Only refresh UI after DB confirms all deletions
       await refreshData();
     } catch (error) {
@@ -292,6 +300,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsSetupComplete(true);
   };
 
+  const toggleTheme = async () => {
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    await AsyncStorage.setItem('isDarkMode', String(next));
+  };
+
   const setCurrency = async (code: string) => {
     await db.setSetting('currency', code);
     setCurrencyState(code);
@@ -317,6 +331,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       value={{
         isLoading,
         isSetupComplete,
+        isDarkMode,
         goal,
         transactions,
         receipts,
@@ -338,6 +353,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         completeSetup,
         setCurrency,
         clearAllData,
+        toggleTheme,
       }}
     >
       {children}
@@ -351,4 +367,10 @@ export const useApp = (): AppContextType => {
     throw new Error('useApp must be used within AppProvider');
   }
   return context;
+};
+
+/** Returns the active color palette (dark or light) based on current theme. */
+export const useColors = (): ColorPalette => {
+  const { isDarkMode } = useApp();
+  return isDarkMode ? DARK_COLORS : LIGHT_COLORS;
 };

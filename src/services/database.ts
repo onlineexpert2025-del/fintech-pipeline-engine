@@ -5,7 +5,7 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 export const initDatabase = async (): Promise<void> => {
   db = await SQLite.openDatabaseAsync('goalpulse.db');
-  
+
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS goals (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,12 +76,12 @@ export const saveGoal = async (goal: Omit<Goal, 'id' | 'createdAt'>): Promise<nu
 export const updateGoal = async (id: number, goal: Partial<Goal>): Promise<void> => {
   const fields: string[] = [];
   const values: any[] = [];
-  
+
   if (goal.name !== undefined) { fields.push('name = ?'); values.push(goal.name); }
   if (goal.targetAmount !== undefined) { fields.push('targetAmount = ?'); values.push(goal.targetAmount); }
   if (goal.monthlySavingsTarget !== undefined) { fields.push('monthlySavingsTarget = ?'); values.push(goal.monthlySavingsTarget); }
   if (goal.deadline !== undefined) { fields.push('deadline = ?'); values.push(goal.deadline); }
-  
+
   if (fields.length > 0) {
     values.push(id);
     await getDb().runAsync(`UPDATE goals SET ${fields.join(', ')} WHERE id = ?`, values);
@@ -108,7 +108,7 @@ export const deleteTransaction = async (id: number): Promise<void> => {
 export const updateTransaction = async (id: number, transaction: Partial<Transaction>): Promise<void> => {
   const fields: string[] = [];
   const values: any[] = [];
-  
+
   if (transaction.type !== undefined) { fields.push('type = ?'); values.push(transaction.type); }
   if (transaction.amount !== undefined) { fields.push('amount = ?'); values.push(transaction.amount); }
   if (transaction.category !== undefined) { fields.push('category = ?'); values.push(transaction.category); }
@@ -116,7 +116,7 @@ export const updateTransaction = async (id: number, transaction: Partial<Transac
   if (transaction.notes !== undefined) { fields.push('notes = ?'); values.push(transaction.notes); }
   if (transaction.date !== undefined) { fields.push('date = ?'); values.push(transaction.date); }
   if (transaction.receiptId !== undefined) { fields.push('receiptId = ?'); values.push(transaction.receiptId); }
-  
+
   if (fields.length > 0) {
     values.push(id);
     await getDb().runAsync(`UPDATE transactions SET ${fields.join(', ')} WHERE id = ?`, values);
@@ -157,14 +157,14 @@ export const deleteReceipt = async (id: number): Promise<void> => {
 export const updateReceipt = async (id: number, receipt: Partial<Receipt>): Promise<void> => {
   const fields: string[] = [];
   const values: any[] = [];
-  
+
   if (receipt.imageUri !== undefined) { fields.push('imageUri = ?'); values.push(receipt.imageUri); }
   if (receipt.storeName !== undefined) { fields.push('storeName = ?'); values.push(receipt.storeName); }
   if (receipt.totalAmount !== undefined) { fields.push('totalAmount = ?'); values.push(receipt.totalAmount); }
   if (receipt.date !== undefined) { fields.push('date = ?'); values.push(receipt.date); }
   if (receipt.items !== undefined) { fields.push('items = ?'); values.push(receipt.items); }
   if (receipt.category !== undefined) { fields.push('category = ?'); values.push(receipt.category); }
-  
+
   if (fields.length > 0) {
     values.push(id);
     await getDb().runAsync(`UPDATE receipts SET ${fields.join(', ')} WHERE id = ?`, values);
@@ -243,7 +243,7 @@ export const getDailyTarget = async (date: string): Promise<DailyTarget | null> 
     'SELECT * FROM daily_targets WHERE date = ?',
     [date]
   );
-  return result ? { ...result, achieved: result.achieved === 1 } : null;
+  return result ? { ...result, achieved: (result.achieved as any) === 1 } : null;
 };
 
 export const saveDailyTarget = async (target: Omit<DailyTarget, 'id' | 'createdAt'>): Promise<number> => {
@@ -260,7 +260,7 @@ export const getMonthlyTargets = async (year: number, month: number): Promise<Da
     'SELECT * FROM daily_targets WHERE date LIKE ? ORDER BY date ASC',
     [`${monthStr}%`]
   );
-  return results.map(r => ({ ...r, achieved: r.achieved === 1 }));
+  return results.map(r => ({ ...r, achieved: (r.achieved as any) === 1 }));
 };
 
 export const markDailyTargetAchieved = async (date: string, achieved: boolean): Promise<void> => {
