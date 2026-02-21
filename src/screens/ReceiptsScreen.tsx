@@ -408,23 +408,6 @@ export const ReceiptsScreen: React.FC = () => {
             </View>
           )}
 
-          {/* Bottom info bar */}
-          <SafeAreaView style={styles.fullScreenFooter} edges={['bottom']}>
-            <View style={styles.footerInfo}>
-              <MaterialIcons name="event" size={16} color="#999" />
-              <Text style={styles.footerText}>
-                Receipt: {selectedReceipt?.date ? formatShortDate(selectedReceipt.date) : '—'}
-              </Text>
-            </View>
-            <View style={[styles.footerInfo, { marginLeft: SPACING.md }]}>
-              <MaterialIcons name="save" size={16} color="#999" />
-              <Text style={styles.footerText}>
-                Saved: {selectedReceipt ? formatShortDate(selectedReceipt.createdAt) : ''}
-              </Text>
-            </View>
-            <Text style={styles.footerHint}>Pinch to zoom</Text>
-          </SafeAreaView>
-
           {/* DELETE DIALOG */}
           {showDeleteDialog && (
             <View style={styles.deleteDialogOverlay}>

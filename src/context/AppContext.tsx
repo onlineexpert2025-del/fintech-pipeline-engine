@@ -320,6 +320,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     for (const r of receipts) {
       await db.deleteReceipt(r.id);
     }
+    // Wipe savings challenge grid state for all 6 combos (5k/10k × Easy/Med/Hard)
+    await AsyncStorage.multiRemove([
+      'savings_grid_state_v3_5000_365',
+      'savings_grid_state_v3_5000_300',
+      'savings_grid_state_v3_5000_250',
+      'savings_grid_state_v3_10000_365',
+      'savings_grid_state_v3_10000_300',
+      'savings_grid_state_v3_10000_250',
+      'savings_challenge_config',
+    ]);
     // Reset setup
     await db.setSetting('setupComplete', 'false');
     setIsSetupComplete(false);

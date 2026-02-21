@@ -1,6 +1,23 @@
 import * as SQLite from 'expo-sqlite';
 import { Goal, Transaction, Receipt, DailyTarget } from '../types';
 
+/**
+ * Returns an ISO-8601 timestamp in the device's LOCAL timezone.
+ * e.g.  "2025-02-20T23:45:00-08:00"
+ * Unlike new Date().toISOString() which is always UTC.
+ */
+const localISOString = (): string => {
+  const now = new Date();
+  const tzOffsetMs = now.getTimezoneOffset() * 60 * 1000; // offset in ms (negative = ahead of UTC)
+  const localTime = new Date(now.getTime() - tzOffsetMs);
+  const isoLocal = localTime.toISOString().slice(0, 19); // "YYYY-MM-DDTHH:mm:ss"
+  const sign = now.getTimezoneOffset() <= 0 ? '+' : '-';
+  const absOffset = Math.abs(now.getTimezoneOffset());
+  const hh = String(Math.floor(absOffset / 60)).padStart(2, '0');
+  const mm = String(absOffset % 60).padStart(2, '0');
+  return `${isoLocal}${sign}${hh}:${mm}`;
+};
+
 let db: SQLite.SQLiteDatabase | null = null;
 
 export const initDatabase = async (): Promise<void> => {
@@ -68,7 +85,7 @@ export const getGoal = async (): Promise<Goal | null> => {
 export const saveGoal = async (goal: Omit<Goal, 'id' | 'createdAt'>): Promise<number> => {
   const result = await getDb().runAsync(
     'INSERT INTO goals (name, targetAmount, monthlySavingsTarget, deadline, createdAt) VALUES (?, ?, ?, ?, ?)',
-    [goal.name, goal.targetAmount, goal.monthlySavingsTarget, goal.deadline || null, new Date().toISOString()]
+    [goal.name, goal.targetAmount, goal.monthlySavingsTarget, goal.deadline || null, localISOString()]
   );
   return result.lastInsertRowId;
 };
@@ -96,7 +113,7 @@ export const getTransactions = async (): Promise<Transaction[]> => {
 export const addTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt'>): Promise<number> => {
   const result = await getDb().runAsync(
     'INSERT INTO transactions (type, amount, category, source, notes, date, receiptId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [transaction.type, transaction.amount, transaction.category || null, transaction.source || null, transaction.notes || null, transaction.date, transaction.receiptId || null, new Date().toISOString()]
+    [transaction.type, transaction.amount, transaction.category || null, transaction.source || null, transaction.notes || null, transaction.date, transaction.receiptId || null, localISOString()]
   );
   return result.lastInsertRowId;
 };
@@ -138,7 +155,7 @@ export const getReceipts = async (): Promise<Receipt[]> => {
 export const addReceipt = async (receipt: Omit<Receipt, 'id' | 'createdAt'>): Promise<number> => {
   const result = await getDb().runAsync(
     'INSERT INTO receipts (imageUri, storeName, totalAmount, date, items, category, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [receipt.imageUri, receipt.storeName || '', receipt.totalAmount, receipt.date, receipt.items || '', receipt.category || 'other', new Date().toISOString()]
+    [receipt.imageUri, receipt.storeName || '', receipt.totalAmount, receipt.date, receipt.items || '', receipt.category || 'other', localISOString()]
   );
   return result.lastInsertRowId;
 };
@@ -249,7 +266,7 @@ export const getDailyTarget = async (date: string): Promise<DailyTarget | null> 
 export const saveDailyTarget = async (target: Omit<DailyTarget, 'id' | 'createdAt'>): Promise<number> => {
   const result = await getDb().runAsync(
     'INSERT OR REPLACE INTO daily_targets (date, targetAmount, achieved, createdAt) VALUES (?, ?, ?, ?)',
-    [target.date, target.targetAmount, target.achieved ? 1 : 0, new Date().toISOString()]
+    [target.date, target.targetAmount, target.achieved ? 1 : 0, localISOString()]
   );
   return result.lastInsertRowId;
 };

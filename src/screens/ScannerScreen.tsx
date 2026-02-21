@@ -204,48 +204,47 @@ export const ScannerScreen: React.FC = () => {
     }
   };
 
-  // Open camera
+  // Open camera — uses ImagePicker so the OS native camera + crop UI fires immediately
   const handleOpenCamera = async () => {
-    // FIX #2: Set system interaction flag before camera
     setSystemInteraction(true);
-    setCameraActive(true);
-    // Clear flag after camera opens
-    setTimeout(() => setSystemInteraction(false), 1000);
-  };
-
-  // Take photo with camera
-  const handleTakePhoto = async () => {
-    if (!cameraRef) {
-      Alert.alert('Error', 'Camera not ready');
-      return;
-    }
-
     try {
-      console.log('[Scanner] Taking photo...');
-      const photo = await cameraRef.takePictureAsync({
-        quality: 0.8,
-        base64: false,
+      // Request camera permission if not already granted
+      if (!permission?.granted) {
+        const { granted } = await requestPermission();
+        if (!granted) {
+          Alert.alert('Permission Required', 'Camera permission is needed to scan receipts.');
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,  // ← native crop UI after shutter
+        quality: 0.9,
       });
 
-      console.log('[Scanner] Photo captured:', photo.uri);
-      setCapturedImage(photo.uri);
-      setCameraActive(false);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        console.log('[Scanner] Camera image captured:', result.assets[0].uri);
+        setCapturedImage(result.assets[0].uri);
+        setCameraActive(false);
+      }
     } catch (error) {
       console.error('[Scanner] Camera error:', error);
-      Alert.alert('Error', 'Failed to take photo');
+      Alert.alert('Error', 'Failed to open camera');
+    } finally {
+      setTimeout(() => setSystemInteraction(false), 1000);
     }
   };
 
   // Pick image from gallery
   const handlePickImage = async () => {
     try {
-      // FIX #2: Set system interaction flag before opening gallery
       setSystemInteraction(true);
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: 'images',
-        allowsEditing: false,
-        quality: 0.8,
+        allowsEditing: true,   // native crop UI
+        quality: 0.9,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -256,7 +255,6 @@ export const ScannerScreen: React.FC = () => {
       console.error('[Scanner] Image picker error:', error);
       Alert.alert('Error', 'Failed to pick image');
     } finally {
-      // Clear flag after gallery closes
       setTimeout(() => setSystemInteraction(false), 1000);
     }
   };
@@ -280,7 +278,7 @@ export const ScannerScreen: React.FC = () => {
             </View>
 
             <View style={styles.cameraBottomBar}>
-              <Pressable style={styles.captureButton} onPress={handleTakePhoto}>
+              <Pressable style={styles.captureButton} onPress={handleOpenCamera}>
                 <View style={styles.captureButtonInner} />
               </Pressable>
             </View>

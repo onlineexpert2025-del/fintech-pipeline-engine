@@ -170,21 +170,6 @@ export const NotificationsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Info Banner */}
-        <View style={styles.infoCard}>
-          <MaterialIcons
-            name={Platform.OS === 'web' ? 'info-outline' : permissionGranted ? 'check-circle' : 'info-outline'}
-            size={20}
-            color={Platform.OS === 'web' ? COLORS.warning : permissionGranted ? COLORS.success : COLORS.primary}
-          />
-          <Text style={styles.infoText}>
-            {Platform.OS === 'web'
-              ? 'Local notifications only work in standalone builds (APK/AAB). Build with EAS to enable notifications.'
-              : permissionGranted
-                ? 'Notifications are enabled and will work when app is installed.'
-                : 'Notification permissions are required. Tap settings below to enable.'}
-          </Text>
-        </View>
 
         {/* Daily Reminders Section */}
         <View style={styles.section}>

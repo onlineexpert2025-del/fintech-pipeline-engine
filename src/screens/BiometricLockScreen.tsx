@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, Alert, AppState, AppStateStatus } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Button } from 'react-native-paper';
@@ -15,11 +15,40 @@ export const BiometricLockScreen: React.FC<BiometricLockScreenProps> = ({ onAuth
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [biometricType, setBiometricType] = useState<string>('biometric');
 
+  // Track whether the app returned from background so we can re-trigger auth
+  const wasInBackground = useRef(false);
+  // Cancellation flag: set to true when going to background so the stale auth result is ignored
+  const cancelled = useRef(false);
+
   useEffect(() => {
     checkBiometricSupport();
     // Auto-trigger authentication on mount
     handleAuthentication();
+
+    // Listen for app state changes to handle background/foreground transitions
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
   }, []);
+
+  const handleAppStateChange = (nextAppState: AppStateStatus) => {
+    if (nextAppState === 'background' || nextAppState === 'inactive') {
+      // Mark as cancelled so any in-flight auth resolves are ignored
+      cancelled.current = true;
+      wasInBackground.current = true;
+      setIsAuthenticating(false);
+      setAuthStatus('App went to background. Please unlock to continue.');
+    } else if (nextAppState === 'active' && wasInBackground.current) {
+      // Returned from background: reset and retry
+      wasInBackground.current = false;
+      cancelled.current = false;
+      // Small delay so the screen is fully visible before prompting
+      setTimeout(() => {
+        handleAuthentication();
+      }, 300);
+    }
+  };
 
   const checkBiometricSupport = async () => {
     try {
@@ -60,15 +89,22 @@ export const BiometricLockScreen: React.FC<BiometricLockScreenProps> = ({ onAuth
     setIsAuthenticating(true);
     setAuthStatus('Authenticating...');
 
+    // Snapshot the cancelled state at launch time
+    const thisCancelled = cancelled;
+
     try {
-      // FIX #3: Force hardware biometric prompt first with disableDeviceFallback: false
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Unlock GoalPulse',
         fallbackLabel: 'Use Passcode',
         cancelLabel: 'Cancel',
         disableDeviceFallback: false, // Allow passcode fallback
-        requireConfirmation: false, // Skip "confirm" dialog on Android
+        requireConfirmation: false,   // Skip "confirm" dialog on Android
       });
+
+      // If the app went to background while this was running, ignore the result
+      if (thisCancelled.current) {
+        return;
+      }
 
       if (result.success) {
         setAuthStatus('Authenticated!');
@@ -78,6 +114,7 @@ export const BiometricLockScreen: React.FC<BiometricLockScreenProps> = ({ onAuth
         setIsAuthenticating(false);
       }
     } catch (error) {
+      if (thisCancelled.current) return;
       console.error('Authentication error:', error);
       setAuthStatus('An error occurred. Please try again.');
       setIsAuthenticating(false);
@@ -90,14 +127,14 @@ export const BiometricLockScreen: React.FC<BiometricLockScreenProps> = ({ onAuth
         <View style={styles.iconContainer}>
           <MaterialIcons name="lock" size={80} color={COLORS.primary} />
         </View>
-        
+
         <Text style={styles.title}>GoalPulse is Locked</Text>
         <Text style={styles.subtitle}>
           Use {biometricType} to unlock
         </Text>
-        
+
         <Text style={styles.status}>{authStatus}</Text>
-        
+
         <Button
           mode="contained"
           onPress={handleAuthentication}

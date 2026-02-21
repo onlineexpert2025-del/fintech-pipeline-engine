@@ -474,7 +474,7 @@ export const ResultScreen: React.FC = () => {
               <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView style={styles.splitContent}>
+            <ScrollView style={styles.splitContent} contentContainerStyle={{ paddingBottom: 100 }}>
               {/* Split Summary */}
               <View style={styles.splitSummary}>
                 <Text style={styles.splitInfo}>

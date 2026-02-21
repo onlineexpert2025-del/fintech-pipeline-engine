@@ -961,7 +961,7 @@ const createStyles = (COLORS: ColorPalette) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     // gap: 4, // React Native gap support might differ, margin works safely
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     backgroundColor: COLORS.surface,
   },
   // SQUARICLE - Rounded Square with 6px radius
